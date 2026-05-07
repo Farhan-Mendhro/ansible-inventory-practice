@@ -167,19 +167,6 @@ ansible dbservers -i inventory.ini -m command -a "uptime"
 ansible webservers -i inventory.ini -m setup
 ```
 
-### Run a Playbook
-
-```bash
-# Run with dry-run first (recommended)
-ansible-playbook -i inventory.ini playbook.yml --check
-
-# Run for real
-ansible-playbook -i inventory.ini playbook.yml
-
-# Target a specific group only
-ansible-playbook -i inventory.ini playbook.yml --limit webservers
-```
-
 ---
 
 ## 💡 Concepts Covered
@@ -197,20 +184,8 @@ ansible-playbook -i inventory.ini playbook.yml --limit webservers
 
 ---
 
-## 📁 Project Structure
 
-```
-ansible-project/
-├── inventory.ini        # Host inventory with groups
-├── playbook.yml         # Example playbook (optional)
-├── server.js            # Node.js dashboard server
-├── public/
-│   └── index.html       # Visual dashboard UI
-├── package.json
-└── README.md
-```
 
----
 
 <div align="center">
   <sub>Built for DevOps learning · Ansible · AWS EC2 · WSL · Passwordless SSH</sub>
