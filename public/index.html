@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ansible Control Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #030712;
+      --surface:   #0a0f1e;
+      --card:      #0d1526;
+      --border:    #1a2744;
+      --border2:   #243559;
+      --green:     #00ff88;
+      --green-dim: #00c96a;
+      --green-glow:#00ff8833;
+      --cyan:      #00d4ff;
+      --cyan-dim:  #0099bb;
+      --red:       #ff4466;
+      --yellow:    #ffcc00;
+      --text:      #ccd6f6;
+      --muted:     #4a6080;
+      --bright:    #e8f4fd;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Rajdhani', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      cursor: crosshair;
+    }
+
+    /* Scanline overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,255,136,0.012) 2px,
+        rgba(0,255,136,0.012) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── NOISE TEXTURE ── */
+    .noise {
+      position: fixed;
+      inset: 0;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── AMBIENT GLOWS ── */
+    .glow { position: fixed; border-radius: 50%; filter: blur(160px); pointer-events: none; }
+    .glow-tl { width: 700px; height: 700px; top: -300px; left: -300px; background: rgba(0,255,136,0.06); z-index: 0; }
+    .glow-br { width: 600px; height: 600px; bottom: -250px; right: -250px; background: rgba(0,212,255,0.07); z-index: 0; }
+
+    /* ── LAYOUT ── */
+    .wrapper {
+      position: relative;
+      z-index: 2;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 28px 80px;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 0 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+      margin-bottom: 64px;
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-box {
+      width: 40px; height: 40px;
+      border: 1px solid var(--green);
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      box-shadow: 0 0 12px var(--green-glow), inset 0 0 12px rgba(0,255,136,0.05);
+    }
+    .logo-box::before {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border: 1px solid rgba(0,255,136,0.3);
+    }
+    .logo-box span { font-family: 'Orbitron', monospace; font-size: 14px; color: var(--green); font-weight: 900; }
+
+    .brand-text h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      color: var(--bright);
+    }
+    .brand-text p {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .sys-stat {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+    .sys-stat span { color: var(--green); }
+
+    .online-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid rgba(0,255,136,0.3);
+      padding: 5px 12px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--green);
+      letter-spacing: 0.1em;
+      background: rgba(0,255,136,0.04);
+    }
+
+    .pulse-dot {
+      width: 6px; height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: blink 1.4s infinite;
+      box-shadow: 0 0 6px var(--green);
+    }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    /* ── HERO ── */
+    .hero {
+      margin-bottom: 72px;
+      animation: fadeUp 0.7s ease 0.1s both;
+    }
+
+    .hero-eyebrow {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--cyan);
+      letter-spacing: 0.2em;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .hero-eyebrow::before {
+      content: '';
+      width: 32px; height: 1px;
+      background: var(--cyan);
+      display: block;
+      box-shadow: 0 0 6px var(--cyan);
+    }
+
+    .hero h2 {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(2rem, 5vw, 3.4rem);
+      font-weight: 900;
+      line-height: 1.08;
+      letter-spacing: -0.01em;
+      margin-bottom: 20px;
+      color: var(--bright);
+    }
+
+    .hero h2 .g {
+      color: var(--green);
+      text-shadow: 0 0 30px rgba(0,255,136,0.4);
+    }
+
+    .hero p {
+      font-size: 1.1rem;
+      color: var(--muted);
+      max-width: 520px;
+      line-height: 1.7;
+      font-weight: 400;
+    }
+
+    /* ── SECTION LABEL ── */
+    .sec-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--cyan);
+      letter-spacing: 0.2em;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sec-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--border2), transparent);
+    }
+
+    /* ── INVENTORY FILE BLOCK ── */
+    .inventory-section { margin-bottom: 56px; animation: fadeUp 0.6s ease 0.2s both; }
+
+    .file-window {
+      border: 1px solid var(--border2);
+      background: var(--card);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .file-window::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
+      opacity: 0.6;
+    }
+
+    .file-titlebar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.4);
+    }
+
+    .file-dot { width: 9px; height: 9px; border-radius: 50%; }
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+
+    .file-name {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-left: 6px;
+      letter-spacing: 0.05em;
+    }
+
+    .file-body {
+      display: grid;
+      grid-template-columns: 48px 1fr;
+    }
+
+    .line-nums {
+      padding: 20px 0;
+      background: rgba(0,0,0,0.25);
+      border-right: 1px solid var(--border);
+      text-align: right;
+    }
+
+    .line-nums span {
+      display: block;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      padding: 0 10px;
+      line-height: 1.85;
+      opacity: 0.5;
+    }
+
+    .code-content {
+      padding: 20px 24px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78rem;
+      line-height: 1.85;
+    }
+
+    .c-comment { color: #3d5a80; }
+    .c-group   { color: var(--cyan); font-weight: bold; }
+    .c-host    { color: var(--green); }
+    .c-var     { color: var(--yellow); }
+    .c-val     { color: #ff9966; }
+    .c-ip      { color: #c084fc; }
+
+    /* ── SERVER CARDS ── */
+    .servers-section { margin-bottom: 56px; animation: fadeUp 0.6s ease 0.3s both; }
+
+    .servers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .server-card {
+      border: 1px solid var(--border2);
+      background: var(--card);
+      padding: 0;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.25s, transform 0.25s;
+      cursor: default;
+    }
+
+    .server-card:hover {
+      border-color: var(--green-dim);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 20px rgba(0,255,136,0.07);
+    }
+
+    .server-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+
+    .card-webserver::after { background: linear-gradient(90deg, var(--green), var(--cyan)); }
+    .card-dbserver::after  { background: linear-gradient(90deg, var(--cyan), #a855f7); }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-head-left { display: flex; align-items: center; gap: 12px; }
+
+    .server-icon {
+      width: 36px; height: 36px;
+      border: 1px solid var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      background: rgba(0,0,0,0.3);
+    }
+
+    .server-name {
+      font-family: 'Orbitron', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--bright);
+      letter-spacing: 0.05em;
+    }
+
+    .server-group-tag {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--muted);
+      margin-top: 2px;
+      letter-spacing: 0.08em;
+    }
+
+    .status-online {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--green);
+      border: 1px solid rgba(0,255,136,0.25);
+      padding: 3px 8px;
+      background: rgba(0,255,136,0.05);
+      letter-spacing: 0.08em;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .card-body { padding: 16px 20px 20px; }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+    }
+    .meta-row:last-child { border-bottom: none; }
+    .meta-key { color: var(--muted); letter-spacing: 0.05em; }
+    .meta-val { color: var(--text); }
+    .meta-val.green { color: var(--green); }
+    .meta-val.cyan  { color: var(--cyan); }
+    .meta-val.purple { color: #c084fc; }
+
+    /* ── FLOW DIAGRAM ── */
+    .flow-section { margin-bottom: 56px; animation: fadeUp 0.6s ease 0.4s both; }
+
+    .flow-diagram {
+      border: 1px solid var(--border2);
+      background: var(--card);
+      padding: 36px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+      row-gap: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .flow-diagram::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 50%, rgba(0,255,136,0.03) 0%, transparent 70%);
+    }
+
+    .flow-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .node-box {
+      border: 1px solid var(--border2);
+      background: rgba(0,0,0,0.4);
+      padding: 14px 20px;
+      text-align: center;
+      min-width: 130px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+    }
+
+    .node-box:hover {
+      border-color: var(--green);
+      box-shadow: 0 0 20px rgba(0,255,136,0.15);
+    }
+
+    .node-box.control { border-color: var(--green); box-shadow: 0 0 16px rgba(0,255,136,0.12); }
+    .node-box.web     { border-color: var(--cyan); }
+    .node-box.db      { border-color: #a855f7; }
+
+    .node-emoji { font-size: 1.4rem; display: block; margin-bottom: 4px; }
+    .node-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--bright);
+    }
+    .node-sub {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.58rem;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .flow-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 0 10px;
+    }
+
+    .arrow-line {
+      width: 60px;
+      height: 1px;
+      background: linear-gradient(90deg, var(--green-dim), var(--cyan-dim));
+      position: relative;
+    }
+
+    .arrow-line::after {
+      content: '▶';
+      position: absolute;
+      right: -8px;
+      top: -6px;
+      font-size: 10px;
+      color: var(--cyan-dim);
+    }
+
+    .arrow-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.55rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .flow-split {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── COMMANDS SECTION ── */
+    .commands-section { margin-bottom: 56px; animation: fadeUp 0.6s ease 0.5s both; }
+
+    .cmd-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    .cmd-card {
+      border: 1px solid var(--border);
+      background: var(--card);
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .cmd-card:hover { border-color: var(--border2); }
+
+    .cmd-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.3);
+    }
+
+    .cmd-num {
+      width: 22px; height: 22px;
+      border: 1px solid var(--green);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Orbitron', monospace;
+      font-size: 0.6rem;
+      color: var(--green);
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+
+    .cmd-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--bright);
+      letter-spacing: 0.04em;
+      flex: 1;
+    }
+
+    .cmd-platform {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.58rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    .cmd-body { padding: 14px 16px; }
+
+    .cmd-line {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.74rem;
+      color: var(--green);
+      background: rgba(0,0,0,0.3);
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      border-left: 2px solid var(--green-dim);
+      word-break: break-all;
+      line-height: 1.6;
+    }
+
+    .cmd-line:last-child { margin-bottom: 0; }
+
+    .cmd-line .prompt { color: var(--muted); user-select: none; }
+    .cmd-line .cmd-comment { color: #2d4a6e; display: block; }
+
+    .cmd-desc {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+      line-height: 1.5;
+      font-weight: 400;
+    }
+
+    /* ── CONCEPTS GRID ── */
+    .concepts-section { margin-bottom: 56px; animation: fadeUp 0.6s ease 0.6s both; }
+
+    .concepts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+
+    .concept-card {
+      border: 1px solid var(--border);
+      background: var(--card);
+      padding: 20px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .concept-card:hover {
+      border-color: var(--border2);
+      transform: translateY(-2px);
+    }
+
+    .concept-icon { font-size: 1.5rem; margin-bottom: 10px; }
+    .concept-name {
+      font-family: 'Orbitron', monospace;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+    .concept-desc {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.6;
+      font-weight: 400;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      animation: fadeUp 0.5s ease 0.7s both;
+    }
+
+    footer span {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    .footer-right {
+      display: flex;
+      gap: 20px;
+    }
+
+    /* ── TYPING CURSOR ── */
+    .cursor {
+      display: inline-block;
+      width: 8px; height: 1em;
+      background: var(--green);
+      animation: blink 1s step-end infinite;
+      vertical-align: text-bottom;
+      margin-left: 2px;
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="noise"></div>
+  <div class="glow glow-tl"></div>
+  <div class="glow glow-br"></div>
+
+  <div class="wrapper">
+
+    <!-- TOP BAR -->
+    <nav class="topbar">
+      <div class="topbar-left">
+        <div class="logo-box"><span>AN</span></div>
+        <div class="brand-text">
+          <h1>ANSIBLE CONTROL</h1>
+          <p>INVENTORY MANAGEMENT SYSTEM // WSL + AWS EC2</p>
+        </div>
+      </div>
+      <div class="status-row">
+        <div class="sys-stat">NODES: <span>2</span></div>
+        <div class="sys-stat">GROUPS: <span>2</span></div>
+        <div class="online-badge"><div class="pulse-dot"></div> CONNECTED</div>
+      </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-eyebrow">DEVOPS PRACTICE PROJECT</div>
+      <h2>Ansible <span class="g">Inventory</span><br/>& Server Grouping<span class="cursor"></span></h2>
+      <p>Practicing infrastructure automation using Ansible inventory files, server grouping, and passwordless SSH authentication across AWS EC2 instances via WSL.</p>
+    </section>
+
+    <!-- INVENTORY FILE -->
+    <section class="inventory-section">
+      <div class="sec-label">01 // INVENTORY FILE</div>
+      <div class="file-window">
+        <div class="file-titlebar">
+          <div class="file-dot dot-r"></div>
+          <div class="file-dot dot-y"></div>
+          <div class="file-dot dot-g"></div>
+          <span class="file-name">~/ansible-project/inventory.ini</span>
+        </div>
+        <div class="file-body">
+          <div class="line-nums">
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+            <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+            <span>11</span><span>12</span><span>13</span><span>14</span><span>15</span>
+            <span>16</span><span>17</span><span>18</span><span>19</span>
+          </div>
+          <div class="code-content">
+            <span class="c-comment"># Ansible Inventory File</span><br/>
+            <span class="c-comment"># Passwordless SSH auth via ~/.ssh/authorized_keys</span><br/>
+            <br/>
+            <span class="c-group">[webservers]</span><br/>
+            <span class="c-host">web01</span> <span class="c-var">ansible_host</span>=<span class="c-ip">18.xxx.xx.10</span> <span class="c-var">ansible_user</span>=<span class="c-val">ubuntu</span> <span class="c-var">ansible_ssh_private_key_file</span>=<span class="c-val">~/.ssh/aws-key.pem</span><br/>
+            <br/>
+            <span class="c-comment"># Web server group vars</span><br/>
+            <span class="c-group">[webservers:vars]</span><br/>
+            <span class="c-var">http_port</span>=<span class="c-ip">80</span><br/>
+            <span class="c-var">ansible_python_interpreter</span>=<span class="c-val">/usr/bin/python3</span><br/>
+            <br/>
+            <span class="c-group">[dbservers]</span><br/>
+            <span class="c-host">db01</span> <span class="c-var">ansible_host</span>=<span class="c-ip">18.xxx.xx.11</span> <span class="c-var">ansible_user</span>=<span class="c-val">ubuntu</span> <span class="c-var">ansible_ssh_private_key_file</span>=<span class="c-val">~/.ssh/aws-key.pem</span><br/>
+            <br/>
+            <span class="c-comment"># All servers group</span><br/>
+            <span class="c-group">[all:vars]</span><br/>
+            <span class="c-var">ansible_ssh_common_args</span>=<span class="c-val">'-o StrictHostKeyChecking=no'</span><br/>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SERVER CARDS -->
+    <section class="servers-section">
+      <div class="sec-label">02 // MANAGED NODES</div>
+      <div class="servers-grid">
+
+        <div class="server-card card-webserver">
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="server-icon">🌐</div>
+              <div>
+                <div class="server-name">WEB01</div>
+                <div class="server-group-tag">[webservers]</div>
+              </div>
+            </div>
+            <div class="status-online"><div class="pulse-dot"></div> ACTIVE</div>
+          </div>
+          <div class="card-body">
+            <div class="meta-row">
+              <span class="meta-key">PROVIDER</span>
+              <span class="meta-val">AWS EC2</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">AMI</span>
+              <span class="meta-val">Ubuntu 24.04 LTS</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">INSTANCE</span>
+              <span class="meta-val cyan">t2.micro</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">AUTH</span>
+              <span class="meta-val green">Passwordless SSH ✓</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">PORT</span>
+              <span class="meta-val">:80</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">GROUP</span>
+              <span class="meta-val cyan">webservers</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="server-card card-dbserver">
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="server-icon">🗄️</div>
+              <div>
+                <div class="server-name">DB01</div>
+                <div class="server-group-tag">[dbservers]</div>
+              </div>
+            </div>
+            <div class="status-online"><div class="pulse-dot"></div> ACTIVE</div>
+          </div>
+          <div class="card-body">
+            <div class="meta-row">
+              <span class="meta-key">PROVIDER</span>
+              <span class="meta-val">AWS EC2</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">AMI</span>
+              <span class="meta-val">Ubuntu 24.04 LTS</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">INSTANCE</span>
+              <span class="meta-val cyan">t2.micro</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">AUTH</span>
+              <span class="meta-val green">Passwordless SSH ✓</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">PORT</span>
+              <span class="meta-val">:5432</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">GROUP</span>
+              <span class="meta-val purple">dbservers</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- FLOW DIAGRAM -->
+    <section class="flow-section">
+      <div class="sec-label">03 // ARCHITECTURE</div>
+      <div class="flow-diagram">
+        <div class="flow-node">
+          <div class="node-box control">
+            <span class="node-emoji">💻</span>
+            <div class="node-label">CONTROL NODE</div>
+            <div class="node-sub">WSL / Ubuntu</div>
+            <div class="node-sub">ansible-playbook</div>
+          </div>
+        </div>
+
+        <div class="flow-arrow">
+          <div class="arrow-line"></div>
+          <div class="arrow-label">SSH (port 22)</div>
+        </div>
+
+        <div class="flow-split">
+          <div class="flow-node">
+            <div class="node-box web">
+              <span class="node-emoji">🌐</span>
+              <div class="node-label">WEB01</div>
+              <div class="node-sub">[webservers]</div>
+              <div class="node-sub">18.xxx.xx.10</div>
+            </div>
+          </div>
+          <div class="flow-node">
+            <div class="node-box db">
+              <span class="node-emoji">🗄️</span>
+              <div class="node-label">DB01</div>
+              <div class="node-sub">[dbservers]</div>
+              <div class="node-sub">18.xxx.xx.11</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMMANDS -->
+    <section class="commands-section">
+      <div class="sec-label">04 // KEY COMMANDS</div>
+      <div class="cmd-grid">
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <div class="cmd-num">1</div>
+            <div class="cmd-title">Generate SSH Key Pair</div>
+            <div class="cmd-platform">WSL</div>
+          </div>
+          <div class="cmd-body">
+            <div class="cmd-desc">Generate an RSA key pair on the control node for passwordless authentication.</div>
+            <div class="cmd-line">
+              <span class="cmd-comment"># generate key pair</span>
+              <span class="prompt">$ </span>ssh-keygen -t rsa -b 4096
+            </div>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <div class="cmd-num">2</div>
+            <div class="cmd-title">Copy Public Key to EC2</div>
+            <div class="cmd-platform">WSL</div>
+          </div>
+          <div class="cmd-body">
+            <div class="cmd-desc">Push your public key to both EC2 instances to enable passwordless SSH login.</div>
+            <div class="cmd-line">
+              <span class="cmd-comment"># copy to webserver</span>
+              <span class="prompt">$ </span>ssh-copy-id -i ~/.ssh/id_rsa.pub ubuntu@&lt;web-ip&gt;
+            </div>
+            <div class="cmd-line">
+              <span class="cmd-comment"># copy to dbserver</span>
+              <span class="prompt">$ </span>ssh-copy-id -i ~/.ssh/id_rsa.pub ubuntu@&lt;db-ip&gt;
+            </div>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <div class="cmd-num">3</div>
+            <div class="cmd-title">Test Connectivity</div>
+            <div class="cmd-platform">ANSIBLE</div>
+          </div>
+          <div class="cmd-body">
+            <div class="cmd-desc">Ping all hosts or specific groups to verify the inventory and SSH connectivity.</div>
+            <div class="cmd-line">
+              <span class="cmd-comment"># ping all nodes</span>
+              <span class="prompt">$ </span>ansible all -i inventory.ini -m ping
+            </div>
+            <div class="cmd-line">
+              <span class="cmd-comment"># ping only webservers</span>
+              <span class="prompt">$ </span>ansible webservers -i inventory.ini -m ping
+            </div>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <div class="cmd-num">4</div>
+            <div class="cmd-title">List Inventory Hosts</div>
+            <div class="cmd-platform">ANSIBLE</div>
+          </div>
+          <div class="cmd-body">
+            <div class="cmd-desc">Verify grouping by listing all hosts from the inventory file.</div>
+            <div class="cmd-line">
+              <span class="cmd-comment"># list all hosts</span>
+              <span class="prompt">$ </span>ansible-inventory -i inventory.ini --list
+            </div>
+            <div class="cmd-line">
+              <span class="cmd-comment"># graph view</span>
+              <span class="prompt">$ </span>ansible-inventory -i inventory.ini --graph
+            </div>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <div class="cmd-num">5</div>
+            <div class="cmd-title">Run Ad-Hoc Commands</div>
+            <div class="cmd-platform">ANSIBLE</div>
+          </div>
+          <div class="cmd-body">
+            <div class="cmd-desc">Run one-off commands against a specific group without a playbook.</div>
+            <div class="cmd-line">
+              <span class="cmd-comment"># check uptime on dbservers</span>
+              <span class="prompt">$ </span>ansible dbservers -i inventory.ini -m command -a "uptime"
+            </div>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <div class="cmd-num">6</div>
+            <div class="cmd-title">Run a Playbook</div>
+            <div class="cmd-platform">ANSIBLE</div>
+          </div>
+          <div class="cmd-body">
+            <div class="cmd-desc">Execute a playbook targeting groups defined in the inventory.</div>
+            <div class="cmd-line">
+              <span class="prompt">$ </span>ansible-playbook -i inventory.ini playbook.yml
+            </div>
+            <div class="cmd-line">
+              <span class="cmd-comment"># dry run first</span>
+              <span class="prompt">$ </span>ansible-playbook -i inventory.ini playbook.yml --check
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CONCEPTS -->
+    <section class="concepts-section">
+      <div class="sec-label">05 // CONCEPTS COVERED</div>
+      <div class="concepts-grid">
+        <div class="concept-card">
+          <div class="concept-icon">📋</div>
+          <div class="concept-name">INVENTORY FILE</div>
+          <div class="concept-desc">Defines all managed nodes in INI format with host variables and group assignments.</div>
+        </div>
+        <div class="concept-card">
+          <div class="concept-icon">🗂️</div>
+          <div class="concept-name">SERVER GROUPING</div>
+          <div class="concept-desc">Logical grouping of hosts (webservers, dbservers) to target commands at specific roles.</div>
+        </div>
+        <div class="concept-card">
+          <div class="concept-icon">🔑</div>
+          <div class="concept-name">PASSWORDLESS SSH</div>
+          <div class="concept-desc">RSA key-pair authentication allowing Ansible to connect without entering a password.</div>
+        </div>
+        <div class="concept-card">
+          <div class="concept-icon">☁️</div>
+          <div class="concept-name">AWS EC2</div>
+          <div class="concept-desc">Cloud-provisioned Ubuntu instances serving as managed nodes in the Ansible setup.</div>
+        </div>
+        <div class="concept-card">
+          <div class="concept-icon">🐧</div>
+          <div class="concept-name">WSL</div>
+          <div class="concept-desc">Windows Subsystem for Linux used as the Ansible control node on a Windows machine.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+      <span>ANSIBLE INVENTORY PRACTICE // DEVOPS LEARNING PROJECT</span>
+      <div class="footer-right">
+        <span id="uptime-display">UPTIME: 0s</span>
+        <span id="time-display"></span>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    // Live clock
+    function updateTime() {
+      const now = new Date();
+      document.getElementById('time-display').textContent =
+        now.toLocaleTimeString('en-US', { hour12: false });
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+
+    // Uptime counter
+    let sec = 0;
+    setInterval(() => {
+      sec++;
+      const m = Math.floor(sec / 60), s = sec % 60;
+      document.getElementById('uptime-display').textContent =
+        `UPTIME: ${m ? m + 'm ' : ''}${s}s`;
+    }, 1000);
+  </script>
+</body>
+</html>
